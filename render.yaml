@@ -1,0 +1,20 @@
+# render.yaml
+
+services:
+  # Nombre del servicio web
+  - type: web
+    name: backend-pixabay # Puedes cambiar este nombre
+    env: python # Especifica que es un entorno de Python
+    plan: free # Elige el plan de Render (el gratuito es suficiente)
+    
+    # Comandos para el despliegue
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+
+    # Configuración de las variables de entorno
+    # ¡MUY IMPORTANTE! Añade tu clave de API en el dashboard de Render, no aquí.
+    envVars:
+      - key: PIXABAY_API_KEY
+        sync: false # Poner 'sync: false' para manejarlo como secreto desde el dashboard
+      - key: PYTHON_VERSION
+        value: 3.11.4 # Especifica una versión de Python
