@@ -3,18 +3,32 @@
 services:
   # Nombre del servicio web
   - type: web
-    name: backend-pixabay # Puedes cambiar este nombre
-    env: python # Especifica que es un entorno de Python
-    plan: free # Elige el plan de Render (el gratuito es suficiente)
+    name: backend-pixabay-ia # Puedes cambiar este nombre
+    env: python
+    plan: free
     
     # Comandos para el despliegue
+    # Se asegura de instalar la nueva librería desde requirements.txt
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app"
 
     # Configuración de las variables de entorno
-    # ¡MUY IMPORTANTE! Añade tu clave de API en el dashboard de Render, no aquí.
+    # Añadimos las nuevas variables aquí para que Render las reconozca.
+    # Los valores reales se configuran como "Secret Files" o "Environment Variables"
+    # en el dashboard de Render para mantenerlos seguros.
     envVars:
-      - key: PIXABAY_API_KEY
-        sync: false # Poner 'sync: false' para manejarlo como secreto desde el dashboard
       - key: PYTHON_VERSION
-        value: 3.11.4 # Especifica una versión de Python
+        value: 3.11.4 # O la versión que prefieras
+      
+      # --- Claves de API y Secretos ---
+      - key: PIXABAY_API_KEY
+        sync: false 
+      - key: GOOGLE_API_KEY # <-- AÑADIDO
+        sync: false
+        
+      # --- Credenciales de Google Cloud Storage ---
+      - key: GCS_BUCKET_NAME # <-- AÑADIDO (Buena práctica)
+        sync: false
+      - key: GCS_CREDENTIALS_JSON # <-- AÑADIDO (Buena práctica)
+        sync: false
+        
