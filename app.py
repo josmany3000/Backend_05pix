@@ -14,14 +14,12 @@ load_dotenv()
 
 # --- Configuración de Google Cloud Storage ---
 GCS_BUCKET_NAME = os.getenv('GCS_BUCKET_NAME')
-GCS_CREDENTIALS_JSON_STR = os.getenv('GCS_CREDENTIALS_JSON') # Renombrada para claridad
+GCS_CREDENTIALS_JSON_STR = os.getenv('GCS_CREDENTIALS_JSON')
 storage_client = None
 
 # Inicializar el cliente de GCS si las credenciales están disponibles
 if GCS_CREDENTIALS_JSON_STR:
     try:
-        # Importante: Las credenciales en JSON deben ser parseadas correctamente.
-        # En muchos entornos, el JSON se pasa como una cadena de texto.
         import json
         gcs_credentials_dict = json.loads(GCS_CREDENTIALS_JSON_STR)
         storage_client = storage.Client.from_service_account_info(gcs_credentials_dict)
@@ -44,12 +42,13 @@ def home():
     """Ruta de bienvenida para verificar que el backend está funcionando."""
     return "Backend de Pixabay y GCS para Videos IA está activo."
 
-# --- Endpoint de Pixabay (AHORA CORREGIDO Y COMPLETO) ---
+# --- Endpoint de Pixabay (CON LA CORRECCIÓN FINAL) ---
 @app.route('/api/search-pixabay', methods=['GET'])
 def search_pixabay():
     """
     Busca imágenes en la API de Pixabay y devuelve los resultados.
     Esta función ahora maneja todos los casos y siempre devuelve una respuesta.
+    Además, limita la longitud del query a 100 caracteres para cumplir con la API.
     """
     # 1. Obtener el término de búsqueda de los parámetros de la URL (?q=...)
     query = request.args.get('q')
@@ -58,36 +57,39 @@ def search_pixabay():
     if not query:
         return jsonify({"error": "Falta el parámetro de búsqueda 'q'"}), 400
 
-    # 3. Validar que la API Key de Pixabay esté configurada en el servidor
+    # --- INICIO DE LA MODIFICACIÓN FINAL ---
+    # 3. Limitar la longitud del query a 100 caracteres (límite de la API de Pixabay)
+    if len(query) > 100:
+        print(f"Advertencia: El query original de {len(query)} caracteres ha sido truncado a 100.")
+        query = query[:100]
+    # --- FIN DE LA MODIFICACIÓN FINAL ---
+
+    # 4. Validar que la API Key de Pixabay esté configurada en el servidor
     if not PIXABAY_API_KEY:
         print("Error: PIXABAY_API_KEY no está configurada en las variables de entorno.")
         return jsonify({"error": "El servicio de búsqueda de imágenes no está configurado en el servidor."}), 500
 
-    # 4. Preparar los parámetros para la petición a la API de Pixabay
+    # 5. Preparar los parámetros para la petición a la API de Pixabay
     params = {
         'key': PIXABAY_API_KEY,
-        'q': query,
+        'q': query,  # Se usa el query original o el truncado
         'image_type': 'photo',
-        'lang': 'es',  # Buscar en español para mejores resultados locales
-        'per_page': 20 # Limitar a 20 resultados
+        'lang': 'es',
+        'per_page': 20
     }
 
-    # 5. Realizar la petición y manejar posibles errores de conexión
+    # 6. Realizar la petición y manejar posibles errores de conexión
     try:
         response = requests.get(PIXABAY_API_URL, params=params)
-        # Si la respuesta de la API fue un error (ej: 4xx, 5xx), lanzar una excepción
         response.raise_for_status() 
 
-        # Extraer los datos JSON de la respuesta
         data = response.json()
         
-        # Devolver los datos al frontend. ¡Esta es una respuesta válida!
         return jsonify(data), 200
 
     except requests.exceptions.RequestException as e:
-        # Este bloque se ejecuta si hay un problema de red o si la API de Pixabay devuelve un error.
         print(f"Error al contactar la API de Pixabay: {e}")
-        return jsonify({"error": "No se pudo comunicar con el servicio externo de imágenes."}), 502 # 502 Bad Gateway es apropiado aquí
+        return jsonify({"error": "No se pudo comunicar con el servicio externo de imágenes."}), 502
 
 
 # --- Endpoint para subir archivos a Google Cloud Storage ---
@@ -97,7 +99,6 @@ def upload_media():
     Recibe un archivo (imagen/video) del frontend, lo sube a GCS y 
     devuelve una URL pública.
     """
-    # Validar que el cliente de GCS y el nombre del bucket estén configurados
     if not storage_client or not GCS_BUCKET_NAME:
         return jsonify({"error": "El servicio de almacenamiento no está configurado en el servidor."}), 500
 
@@ -130,12 +131,10 @@ def upload_media():
             print(f"Error al subir el archivo a GCS: {e}")
             return jsonify({"error": "No se pudo subir el archivo al almacenamiento en la nube."}), 500
     
-    # Esta línea es un seguro, aunque es difícil llegar a ella con las validaciones anteriores.
     return jsonify({"error": "Ocurrió un error inesperado con el archivo."}), 500
 
 
 if __name__ == '__main__':
-    # El modo debug es útil para desarrollo, pero debe estar desactivado en producción.
-    # Render lo maneja automáticamente.
+    # Configuración para ser compatible con plataformas como Render
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5001)))
 
