@@ -42,55 +42,52 @@ def home():
     """Ruta de bienvenida para verificar que el backend está funcionando."""
     return "Backend de Pixabay y GCS para Videos IA está activo."
 
-# --- Endpoint de Pixabay (CON LA CORRECCIÓN FINAL) ---
+# --- Endpoint de Pixabay (ACTUALIZADO PARA ACEPTAR ORIENTACIÓN) ---
 @app.route('/api/search-pixabay', methods=['GET'])
 def search_pixabay():
     """
-    Busca imágenes en la API de Pixabay y devuelve los resultados.
-    Esta función ahora maneja todos los casos y siempre devuelve una respuesta.
-    Además, limita la longitud del query a 100 caracteres para cumplir con la API.
+    Busca imágenes en la API de Pixabay.
+    Ahora acepta 'orientation' y limita el largo del 'query'.
     """
-    # 1. Obtener el término de búsqueda de los parámetros de la URL (?q=...)
+    # 1. Obtener los parámetros de la URL
     query = request.args.get('q')
+    orientation = request.args.get('orientation', 'all').lower()
 
-    # 2. Validar que se haya proporcionado un término de búsqueda
+    # 2. Validaciones de entrada
     if not query:
         return jsonify({"error": "Falta el parámetro de búsqueda 'q'"}), 400
 
-    # --- INICIO DE LA MODIFICACIÓN FINAL ---
-    # 3. Limitar la longitud del query a 100 caracteres (límite de la API de Pixabay)
-    if len(query) > 100:
-        print(f"Advertencia: El query original de {len(query)} caracteres ha sido truncado a 100.")
-        query = query[:100]
-    # --- FIN DE LA MODIFICACIÓN FINAL ---
+    if orientation not in ['all', 'horizontal', 'vertical']:
+        orientation = 'all' # Valor por defecto si no es válido
 
-    # 4. Validar que la API Key de Pixabay esté configurada en el servidor
     if not PIXABAY_API_KEY:
-        print("Error: PIXABAY_API_KEY no está configurada en las variables de entorno.")
-        return jsonify({"error": "El servicio de búsqueda de imágenes no está configurado en el servidor."}), 500
+        print("Error: PIXABAY_API_KEY no está configurada.")
+        return jsonify({"error": "El servicio de búsqueda de imágenes no está configurado."}), 500
+    
+    # 3. Limitar la longitud del query a 100 caracteres (límite de Pixabay)
+    if len(query) > 100:
+        print(f"Advertencia: Query truncado a 100 caracteres. Original: {query}")
+        query = query[:100]
 
-    # 5. Preparar los parámetros para la petición a la API de Pixabay
+    # 4. Preparar los parámetros para la petición a la API
     params = {
         'key': PIXABAY_API_KEY,
-        'q': query,  # Se usa el query original o el truncado
+        'q': query,
         'image_type': 'photo',
         'lang': 'es',
-        'per_page': 20
+        'per_page': 50,  # Aumentamos para tener más variedad de donde escoger
+        'orientation': orientation # Parámetro de orientación añadido
     }
 
-    # 6. Realizar la petición y manejar posibles errores de conexión
+    # 5. Realizar la petición
     try:
         response = requests.get(PIXABAY_API_URL, params=params)
         response.raise_for_status() 
-
         data = response.json()
-        
         return jsonify(data), 200
-
     except requests.exceptions.RequestException as e:
         print(f"Error al contactar la API de Pixabay: {e}")
         return jsonify({"error": "No se pudo comunicar con el servicio externo de imágenes."}), 502
-
 
 # --- Endpoint para subir archivos a Google Cloud Storage ---
 @app.route('/api/upload-media', methods=['POST'])
@@ -117,24 +114,15 @@ def upload_media():
         try:
             bucket = storage_client.bucket(GCS_BUCKET_NAME)
             blob = bucket.blob(unique_filename)
-
-            blob.upload_from_file(
-                file,
-                content_type=file.content_type
-            )
-            
+            blob.upload_from_file(file, content_type=file.content_type)
             blob.make_public()
-
             return jsonify({"imageUrl": blob.public_url}), 200
-
         except Exception as e:
             print(f"Error al subir el archivo a GCS: {e}")
             return jsonify({"error": "No se pudo subir el archivo al almacenamiento en la nube."}), 500
     
     return jsonify({"error": "Ocurrió un error inesperado con el archivo."}), 500
 
-
 if __name__ == '__main__':
-    # Configuración para ser compatible con plataformas como Render
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5001)))
-
+        
