@@ -6,5 +6,4 @@ requests==2.32.3
 gunicorn==22.0.0
 python-dotenv==1.0.1
 google-cloud-storage==2.16.0 # NUEVA DEPENDENCIA
-werkzeug==3.0.3 # Añadido para secure_filename
-pip install google-generativeai
+google-generativeai==0.5.4
